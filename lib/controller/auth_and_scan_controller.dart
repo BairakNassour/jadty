@@ -1,13 +1,13 @@
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:jadty/model/reading_request.dart';
 import 'package:jadty/model/user_model.dart';
 
 class AuthAndScanController {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  // final FirebaseAuth _auth = FirebaseAuth.instance;
+  // final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   final ImagePicker _picker = ImagePicker();
 
   // نستخدم Completer لربط الـ Listener مع دالة تسجيل الدخول
@@ -18,7 +18,7 @@ class AuthAndScanController {
 
   // المُنشئ (Constructor): يعمل تلقائياً عند استدعاء الكنترولر لتهيئة جوجل
   AuthAndScanController() {
-    _initSocialListeners();
+    // _initSocialListeners();
   }
 
   // الحصول على المستخدم الحالي (يتفقد الضيف أولاً ثم Firebase)
@@ -27,15 +27,15 @@ class AuthAndScanController {
       return _guestUser;
     }
 
-    final user = _auth.currentUser;
-    if (user == null) return null;
+    // final user = _auth.currentUser;
+    // if (user == null) return null;
 
-    return UserModel(
-      uid: user.uid,
-      displayName: user.displayName ?? 'مستخدم',
-      email: user.email ?? '',
-      photoUrl: user.photoURL ?? '',
-    );
+    // return UserModel(
+    //   uid: user.uid,
+    //   displayName: user.displayName ?? 'مستخدم',
+    //   email: user.email ?? '',
+    //   photoUrl: user.photoURL ?? '',
+    // );
   }
 
   // تسجيل الدخول كضيف مع تعبئة كامل الحقول بقيم افتراضية لتجنب الـ null
@@ -85,61 +85,61 @@ class AuthAndScanController {
     return null;
   }
 
-  // التهيئة والاستماع لأحداث جوجل مع إضافة الـ serverClientId
-  void _initSocialListeners() {
-    _googleSignIn.initialize(
-      serverClientId: '894366798660-q8ev4e785d5dqngsfh4iuphlerrd2lsv.apps.googleusercontent.com',
-    ).then((_) {
-      _googleSignIn.authenticationEvents.listen((event) async {
-        GoogleSignInAccount? googleUser;
+  // // التهيئة والاستماع لأحداث جوجل مع إضافة الـ serverClientId
+  // void _initSocialListeners() {
+  //   _googleSignIn.initialize(
+  //     serverClientId: '894366798660-q8ev4e785d5dqngsfh4iuphlerrd2lsv.apps.googleusercontent.com',
+  //   ).then((_) {
+  //     _googleSignIn.authenticationEvents.listen((event) async {
+  //       GoogleSignInAccount? googleUser;
 
-        if (event is GoogleSignInAuthenticationEventSignIn) {
-          googleUser = event.user;
-        } else {
-          googleUser = null;
-        }
+  //       if (event is GoogleSignInAuthenticationEventSignIn) {
+  //         googleUser = event.user;
+  //       } else {
+  //         googleUser = null;
+  //       }
 
-        if (googleUser != null) {
-          final googleAuth = await googleUser.authentication;
+  //       if (googleUser != null) {
+  //         final googleAuth = await googleUser.authentication;
 
-          final credential = GoogleAuthProvider.credential(
-            idToken: googleAuth.idToken,
-          );
+  //         // final credential = GoogleAuthProvider.credential(
+  //         //   idToken: googleAuth.idToken,
+  //         // );
 
-          final userCredential = await _auth.signInWithCredential(credential);
-          final user = userCredential.user;
+  //         final userCredential = await _auth.signInWithCredential(credential);
+  //         final user = userCredential.user;
 
-          if (user != null) {
-            _guestUser = null; // إعادة تعيين حساب الضيف إذا سجل بجوجل
+  //         if (user != null) {
+  //           _guestUser = null; // إعادة تعيين حساب الضيف إذا سجل بجوجل
 
-            final userModel = UserModel(
-              uid: user.uid,
-              displayName: user.displayName ?? 'مستخدم',
-              email: user.email ?? '',
-              photoUrl: user.photoURL ?? '',
-            );
+  //           final userModel = UserModel(
+  //             uid: user.uid,
+  //             displayName: user.displayName ?? 'مستخدم',
+  //             email: user.email ?? '',
+  //             photoUrl: user.photoURL ?? '',
+  //           );
 
-            // إرسال النتيجة الناجحة
-            if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
-              _loginCompleter!.complete(userModel);
-            }
-          }
-        } else {
-          // إرسال نتيجة فارغة في حال الإلغاء
-          if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
-            _loginCompleter!.complete(null);
-          }
-        }
-      });
-    });
-  }
+  //           // إرسال النتيجة الناجحة
+  //           if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
+  //             _loginCompleter!.complete(userModel);
+  //           }
+  //         }
+  //       } else {
+  //         // إرسال نتيجة فارغة في حال الإلغاء
+  //         if (_loginCompleter != null && !_loginCompleter!.isCompleted) {
+  //           _loginCompleter!.complete(null);
+  //         }
+  //       }
+  //     });
+  //   });
+  // }
 
   // تشغيل عملية تسجيل الدخول لجوجل
   Future<UserModel?> signInWithGoogle() async {
     _loginCompleter = Completer<UserModel?>();
 
     try {
-      await _googleSignIn.authenticate();
+      // await _googleSignIn.authenticate();
     } catch (e) {
       print("Google Auth Error: $e");
       if (!_loginCompleter!.isCompleted) {
@@ -154,8 +154,8 @@ class AuthAndScanController {
   Future<void> signOut() async {
     try {
       _guestUser = null; // مسح بيانات الضيف عند الخروج
-      await _auth.signOut();
-      await _googleSignIn.signOut();
+      // await _auth.signOut();
+      // await _googleSignIn.signOut();
     } catch (e) {
       print("SignOut Error: $e");
     }

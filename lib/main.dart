@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
+// import 'package:firebase_core/firebase_core.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart'; // 1. إضافة الاستيراد
 import 'package:jadty/auth/splash_screen.dart';
 
@@ -7,7 +7,7 @@ import 'package:jadty/auth/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await Firebase.initializeApp(); // تهيئة الفايربيز
+  // await Firebase.initializeApp(); // تهيئة الفايربيز
   await MobileAds.instance.initialize(); // 2. إضافة تهيئة إعلانات Google AdMob
 
   runApp(const GrandmaApp());

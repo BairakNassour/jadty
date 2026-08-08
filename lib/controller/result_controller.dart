@@ -5,6 +5,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
 import 'package:jadty/model/reading_request.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ResultController extends ChangeNotifier {
   final ReadingRequest request;
@@ -41,14 +42,16 @@ class ResultController extends ChangeNotifier {
         countryName.contains('الكويت') ||
         countryName.contains('قطر') ||
         countryName.contains('عمان') ||
-        countryName.contains('البحرين')) return 'ar-SA';
+        countryName.contains('البحرين'))
+      return 'ar-SA';
     if (countryName.contains('سوريا') ||
         countryName.contains('لبنان') ||
         countryName.contains('الأردن') ||
-        countryName.contains('فلسطين')) return 'ar-JO';
+        countryName.contains('فلسطين'))
+      return 'ar-JO';
     if (countryName.contains('المغرب')) return 'ar-MA';
     if (countryName.contains('العراق')) return 'ar-IQ';
-    return 'ar-SA'; 
+    return 'ar-SA';
   }
 
   Future<void> _initTts() async {
@@ -74,8 +77,10 @@ class ResultController extends ChangeNotifier {
           if (voice["locale"].toString().startsWith("ar") &&
               (voice["name"].toString().contains("language") ||
                   voice["name"].toString().contains("network"))) {
-            await _flutterTts.setVoice(
-                {"name": voice["name"], "locale": voice["locale"]});
+            await _flutterTts.setVoice({
+              "name": voice["name"],
+              "locale": voice["locale"],
+            });
             break;
           }
         }
@@ -119,9 +124,9 @@ class ResultController extends ChangeNotifier {
     analyzeWithGemini();
   }
 
-Future<void> analyzeWithGemini() async {
+  Future<void> analyzeWithGemini() async {
     String requestDetails = '';
-   
+
     switch (request.type) {
       case ReadingType.cup:
         requestDetails = 'قراءة فنجان القهوة بناءً على الصورة المرفقة.';
@@ -140,7 +145,8 @@ Future<void> analyzeWithGemini() async {
         break;
     }
 
-    final promptText = '''
+    final promptText =
+        '''
 أنتِ الآن "جدة" طيّبة وعجوز خفيفة الدم من دولة "$country" ومن منطقة "$region".
 المستخدم هو حفيدك العزيز وبرجه هو "$zodiac".
 
@@ -167,7 +173,8 @@ ${(request.type == ReadingType.cup || request.type == ReadingType.palm) ? '- ي�
 ''';
 
     // 🇸🇾 التحقق مما إذا كانت الدولة هي سوريا (بالعربية أو الإنجليزية)
-    final bool isSyria = country.contains('سوريا') || country.toLowerCase().contains('syria');
+    final bool isSyria =
+        country.contains('سوريا') || country.toLowerCase().contains('syria');
 
     // 🔄 إذا كانت الدولة سوريا، يتم التوجه مباشرةً إلى البروكسي وتجاوز الاتصال المباشر
     if (isSyria) {
@@ -178,9 +185,16 @@ ${(request.type == ReadingType.cup || request.type == ReadingType.palm) ? '- ي�
 
     // 🌟 1. المحاولة الأولى: الاتصال المباشر (بقية الدول)
     try {
-      const apiKey = 'AQ.Ab8RN6IwTvRgy7iv6T9SqYRNl5wW2w42p5Um8gZgzLXG69g9jQ';
-      final modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash'];
+      // جلب المفتاح المخزن من SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final apiKey = prefs.getString('GEMINI_API_KEY');
+       print(apiKey);
+      // التحقق من وجود المفتاح
+      if (apiKey == null || apiKey.isEmpty) {
+        throw Exception('مفتاح Gemini API غير موجود في SharedPreferences!');
+      }
 
+      final modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash'];
       final prompt = TextPart(promptText);
       List<Part> contentParts = [prompt];
       if (request.imagePath != null && request.imagePath!.isNotEmpty) {
@@ -196,7 +210,9 @@ ${(request.type == ReadingType.cup || request.type == ReadingType.palm) ? '- ي�
           response = await model.generateContent([Content.multi(contentParts)]);
 
           if (response.text != null && response.text!.isNotEmpty) {
-            debugPrint('✅ تم التحليل بنجاح بالاتصال المباشر عبر النموذج: $modelName');
+            debugPrint(
+              '✅ تم التحليل بنجاح بالاتصال المباشر عبر النموذج: $modelName',
+            );
             grandmaResponse = response.text!;
             isLoading = false;
             hasError = false;
@@ -208,19 +224,21 @@ ${(request.type == ReadingType.cup || request.type == ReadingType.palm) ? '- ي�
           debugPrint('خطأ في الاتصال المباشر للنموذج $modelName: $e');
         }
       }
-      
+
       throw Exception('فشل الاتصال المباشر بكل النماذج');
-      
     } catch (directError) {
-      debugPrint('⚠️ فشل الاتصال المباشر، جاري التحويل التلقائي لسيرفر هوتسنغر (Fallback)...');
+      debugPrint(
+        '⚠️ فشل الاتصال المباشر، جاري التحويل التلقائي لسيرفر هوتسنغر (Fallback)...',
+      );
       await _callHostingerProxy(promptText);
     }
   }
 
   // 🌐 تابع مساعد للاتصال بسيرفر هوتسنغر (البروكسي)
-  Future<void> _callHostingerProxy(String promptText) async {
+Future<void> _callHostingerProxy(String promptText) async {
     try {
-      const String hostingerApiUrl = 'https://jadty.inchcode.com/api.php?action=gemini_proxy'; 
+      const String hostingerApiUrl =
+          'https://jadty.inchcode.com/api.php?action=gemini_proxy';
 
       String? base64Image;
       if (request.imagePath != null && request.imagePath!.isNotEmpty) {
@@ -237,24 +255,36 @@ ${(request.type == ReadingType.cup || request.type == ReadingType.palm) ? '- ي�
         }),
       );
 
+      // سجلات تقنية للمطور فقط في الـ Console
+      debugPrint('📥 Status Code: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final apiResponseText = data['text'] ?? data['response']; 
 
-        if (apiResponseText != null && apiResponseText.toString().isNotEmpty) {
-          grandmaResponse = apiResponseText;
-          isLoading = false;
-          hasError = false;
-          notifyListeners();
-          speak(grandmaResponse);
-          debugPrint('✅ تم جلب الرد بنجاح من سيرفر هوتسنغر (Proxy)!');
-          return;
+        if (data is Map && !data.containsKey('error')) {
+          final apiResponseText = data['text'] ?? data['response'];
+
+          if (apiResponseText != null &&
+              apiResponseText.toString().trim().isNotEmpty) {
+            grandmaResponse = apiResponseText.toString();
+            isLoading = false;
+            hasError = false;
+            notifyListeners();
+            speak(grandmaResponse);
+            return;
+          }
         }
       }
-      throw Exception('استجابة غير صالحة من سيرفر هوتسنغر');
-    } catch (hostingerError) {
-      debugPrint('❌ فشل الاتصال عبر البروكسي: $hostingerError');
-      grandmaResponse = 'يا ستي صار خطأ وما قدرت اسمعك منيح!\n';
+
+      // إذا لم تنجح الاستجابة ننتقل للـ catch
+      throw Exception('Server issue');
+    } catch (e) {
+      // طباعة تفاصيل الخطأ للبرمجيات فقط بداخل الـ Console
+      debugPrint('❌ Internal Error: $e');
+
+      // رد الجدة المحبب والنقي بدون أي تفاصيل تقنية
+      grandmaResponse =
+          'يا تقبرني يا ستي، شكل الخط عم يقطع والنظارات مشوشة شوية وما قدرت أفهم عليك منيح.. ارجع حاكيني مرة ثانية يا عيوني!';
       isLoading = false;
       hasError = true;
       notifyListeners();

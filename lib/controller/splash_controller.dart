@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../model/app_config_model.dart';
 
 class SplashController {
-  static const String configUrl = 'https://jadty.inchcode.com/api.php?action=config';
+  static const String configUrl =
+      'https://jadty.inchcode.com/api.php?action=config';
 
   final List<String> grandmaPhrases = [
     'عم بصُب القهوة ونستنّاها تبرد...',
@@ -15,12 +17,21 @@ class SplashController {
   /// جلب الإعدادات من السيرفر
   Future<AppConfigModel?> fetchAppConfig() async {
     try {
-      final response = await http.get(Uri.parse(configUrl)).timeout(
-        const Duration(seconds: 5),
-      );
+      final response = await http
+          .get(Uri.parse(configUrl))
+          .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+
+        if (data is Map && data.containsKey('GEMINI_API_KEY')) {
+          final String apiKey = data['GEMINI_API_KEY'];
+
+          // حفظ المفتاح
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('GEMINI_API_KEY', apiKey);
+          // print(apiKey);
+        }
         return AppConfigModel.fromJson(data);
       }
     } catch (e) {
@@ -31,8 +42,9 @@ class SplashController {
   }
 
   /// التحقق مما إذا كان إصدار التطبيق الحالي مدعوماً
-// ضع هنا رقم البناء (Build Number) الحالي لتطبيقك يدوياً
-  final int manualBuildNumber = 1; // قم بتغييره يدوياً (مثلاً 2، 3، إلخ) كلما قمت بتحديث التطبيق
+  // ضع هنا رقم البناء (Build Number) الحالي لتطبيقك يدوياً
+  final int manualBuildNumber =
+      1; // قم بتغييره يدوياً (مثلاً 2، 3، إلخ) كلما قمت بتحديث التطبيق
 
   Future<bool> isVersionSupported(AppConfigModel config) async {
     try {
