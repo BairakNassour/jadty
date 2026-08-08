@@ -1,0 +1,13 @@
+# flutter pub run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/logo.png"
+  android: true
+  adaptive_icon_background: "#FFFFFF"  # اختر لون خلفية بسيط
+  adaptive_icon_foreground: "assets/logo.png"
+  min_sdk_android: 21
+
+
+  ios: true
+  # image_path_ios: "assets/icon/icon.png"
+  remove_alpha_channel_ios: true
+

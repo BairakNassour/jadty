@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "894366798660",
+    "project_id": "jadty-63ad6",
+    "storage_bucket": "jadty-63ad6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:894366798660:android:ff13a72fb35ab5559b7d11",
+        "android_client_info": {
+          "package_name": "com.jadty.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "894366798660-qh20ipom3n2tfhhg9s7dtdv3a85fvts5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jadty.app",
+            "certificate_hash": "7fcc8a16f36ea2eb5e8656b9f36abdc3679bc08e"
+          }
+        },
+        {
+          "client_id": "894366798660-q8ev4e785d5dqngsfh4iuphlerrd2lsv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJQkG3U7BGNsEmu0tvsQQUrafGTG6oX8s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "894366798660-q8ev4e785d5dqngsfh4iuphlerrd2lsv.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "894366798660-5s0jpjcrkp1r91ckod6236k2ug75bt93.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.jadty.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
