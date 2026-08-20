@@ -1,4 +1,5 @@
 enum ReadingType {
+  talk,
   cup,        // قراءة الفنجان
   palm,       // قراءة الكف
   askGrandma, // سؤال الجدة

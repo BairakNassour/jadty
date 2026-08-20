@@ -27,8 +27,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String? selectedRegion;
   String? selectedZodiac;
 
-  int coffeeCups = 4;
-  static const int maxCoffeeCups = 4;
+  static const String keyCountry = 'user_selected_country';
+  static const String keyRegion = 'user_selected_region';
+  static const String keyZodiac = 'user_selected_zodiac';
+
+  int coffeeCups = 5;
+  static const int maxCoffeeCups = 5;
 
   InterstitialAd? _interstitialAd;
   bool _isAdLoaded = false;
@@ -46,8 +50,46 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _loadSavedSelections();
     _loadAndCheckCoffeeCups();
     _loadInterstitialAd(); // تحميل الإعلان مسبقاً فور فتح الشاشة
+  }
+
+  Future<void> _loadSavedSelections() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final savedCountry = prefs.getString(keyCountry);
+    final savedRegion = prefs.getString(keyRegion);
+    final savedZodiac = prefs.getString(keyZodiac);
+
+    setState(() {
+      // التأكد من أن البلد المحفوظ موجود في القائمة
+      if (savedCountry != null &&
+          arabCountriesAndRegions.containsKey(savedCountry)) {
+        selectedCountry = savedCountry;
+
+        // التأكد من أن المنطقة المحفوظة تابعة للبلد المحفوظ وموجودة فعلياً
+        if (savedRegion != null &&
+            arabCountriesAndRegions[savedCountry]!.contains(savedRegion)) {
+          selectedRegion = savedRegion;
+        }
+      }
+
+      // التأكد من أن البرج المحفوظ موجود في قائمة الأبراج
+      if (savedZodiac != null && zodiacs.contains(savedZodiac)) {
+        selectedZodiac = savedZodiac;
+      }
+    });
+  }
+
+  // 2. دالة الحفظ الحفظ/الحذف
+  Future<void> _saveSelection(String key, String? value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value != null) {
+      await prefs.setString(key, value);
+    } else {
+      await prefs.remove(key);
+    }
   }
 
   @override
@@ -184,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (type == ReadingType.cup || type == ReadingType.palm) {
       _handleImagePick(type);
-    } else if (type == ReadingType.askGrandma || type == ReadingType.dream) {
+    } else if (type == ReadingType.askGrandma || type == ReadingType.dream ||type == ReadingType.talk) {
       _showTextInputDialog(type);
     }
   }
@@ -196,22 +238,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (request == null) return;
 
-    _showAdAndPerformAction(() async {
-      await _decrementCoffee();
-      if (_controller.currentUser == null) {
-        _showLoginDialog(request);
-      } else {
-        _navigateToResult(request);
-      }
-    });
+    // _showAdAndPerformAction(() async {
+    await _decrementCoffee();
+    if (_controller.currentUser == null) {
+      _showLoginDialog(request);
+    } else {
+    _navigateToResult(request);
+    }
+    // });
   }
 
   void _showTextInputDialog(ReadingType type) {
     final TextEditingController textController = TextEditingController();
-    final String title = type == ReadingType.askGrandma
-        ? 'اسأل الجدة '
-        : 'تفسير حلم ';
-    final String hint = type == ReadingType.askGrandma
+   final String title = type == ReadingType.talk
+    ? 'فضفض للجدة'
+    : type == ReadingType.askGrandma
+        ? 'اسأل الجدة'
+        : 'تفسير حلم';
+
+final String hint = type == ReadingType.talk
+    ? 'خبر الجدة عن مشكلتك وفضفض لها هنا...'
+    : type == ReadingType.askGrandma
         ? 'اكتب سؤالك للجدة هنا...'
         : 'احكِ للجدة حلمك بالتفصيل...';
 
@@ -221,7 +268,9 @@ class _HomeScreenState extends State<HomeScreen> {
         textDirection: TextDirection.rtl,
         child: Dialog(
           backgroundColor: surfaceWhite,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -256,7 +305,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: accentOrange, width: 2),
+                      borderSide: const BorderSide(
+                        color: accentOrange,
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
@@ -278,21 +330,21 @@ class _HomeScreenState extends State<HomeScreen> {
                             return;
                           }
                           Navigator.pop(context);
-        
+
                           // إظهار الإعلان، والانتقال فقط بعد إغلاقه
-                          _showAdAndPerformAction(() async {
-                            await _decrementCoffee();
-                            ReadingRequest request = ReadingRequest(
-                              type: type,
-                              userQuestionOrDream: textController.text.trim(),
-                            );
-        
-                            if (_controller.currentUser == null) {
-                              _showLoginDialog(request);
-                            } else {
-                              _navigateToResult(request);
-                            }
-                          });
+                          // _showAdAndPerformAction(() async {
+                          _decrementCoffee();
+                          ReadingRequest request = ReadingRequest(
+                            type: type,
+                            userQuestionOrDream: textController.text.trim(),
+                          );
+
+                          if (_controller.currentUser == null) {
+                            _showLoginDialog(request);
+                          } else {
+                          _navigateToResult(request);
+                          };
+                          // });
                         },
                         child: const Text(
                           'إرسال للجدة',
@@ -422,209 +474,226 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-void _showLoginDialog(ReadingRequest request) {
-  final nameController = TextEditingController();
+  void _showLoginDialog(ReadingRequest request) {
+    final nameController = TextEditingController();
 
-  showDialog(
-    context: context,
-    barrierColor: primaryCoffee.withOpacity(0.6),
-    builder: (context) => Dialog(
-      backgroundColor: Colors.transparent,
-      child: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: surfaceWhite,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: primaryCoffee.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // أيقونة الفنجان العلوية
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: accentOrange.withOpacity(0.3),
-                      width: 2,
-                    ),
-                  ),
-                  child: Image.asset('assets/coffe.png', height: 28, width: 24),
+    showDialog(
+      context: context,
+      barrierColor: primaryCoffee.withOpacity(0.6),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: surfaceWhite,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryCoffee.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
-                const SizedBox(height: 16),
-                
-                const Text(
-                  'مرحباً بك!',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: primaryCoffee,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                
-                Text(
-                  'لتتمكن الجدة من قراءة طالعك وحفظ نتائجك، اختر طريقة الدخول:',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: primaryCoffee.withOpacity(0.7),
-                    height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-        
-                // حقل إدخال الاسم للضيف (موحد الاستايل)
-                TextField(
-                  controller: nameController,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(color: primaryCoffee),
-                  decoration: InputDecoration(
-                    hintText: 'أدخل اسمك للدخول كضيف...',
-                    hintStyle: TextStyle(color: primaryCoffee.withOpacity(0.4)),
-                    filled: true,
-                    fillColor: bgColor,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: accentOrange, width: 1.5),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-        
-                // زر الدخول كضيف (متاح لكل المنصات بنفس الستايل الأساسي)
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentOrange,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  onPressed: () async {
-                    final enteredName = nameController.text.trim();
-                    if (enteredName.isEmpty) {
-                      _showCustomSnackBar('يرجى كتابة اسمك للمتابعة كضيف');
-                      return;
-                    }
-        
-                    Navigator.pop(context); // إغلاق الدايلوغ
-                    
-                    // حفظ بيانات الضيف ببريد إلكتروني تلقائي name@email.com
-                    final guestUser = await _controller.signInAsGuest(enteredName);
-                    _navigateToResult(request);
-                  },
-                  child: const Text(
-                    'المتابعة كضيف',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-        
-                // زر تسجيل الدخول من خلال جوجل (يظهر فقط في Android)
-                if (Platform.isAndroid) ...[
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: primaryCoffee,
-                      minimumSize: const Size(double.infinity, 50),
-                      side: BorderSide(
-                        color: primaryCoffee.withOpacity(0.2),
-                        width: 1.5,
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // أيقونة الفنجان العلوية
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: accentOrange.withOpacity(0.3),
+                        width: 2,
                       ),
+                    ),
+                    child: Image.asset(
+                      'assets/coffe.png',
+                      height: 28,
+                      width: 24,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'مرحباً بك!',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: primaryCoffee,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  Text(
+                    'لتتمكن الجدة من قراءة طالعك وحفظ نتائجك، اختر طريقة الدخول:',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: primaryCoffee.withOpacity(0.7),
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // حقل إدخال الاسم للضيف (موحد الاستايل)
+                  TextField(
+                    controller: nameController,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(color: primaryCoffee),
+                    decoration: InputDecoration(
+                      hintText: 'أدخل اسمك للدخول كضيف...',
+                      hintStyle: TextStyle(
+                        color: primaryCoffee.withOpacity(0.4),
+                      ),
+                      filled: true,
+                      fillColor: bgColor,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: accentOrange, width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // زر الدخول كضيف (متاح لكل المنصات بنفس الستايل الأساسي)
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentOrange,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     onPressed: () async {
-                      Navigator.pop(context); // إغلاق الدايلوغ
-                      final user = await _controller.signInWithGoogle();
-                      if (user != null) {
-                        _navigateToResult(request);
-                      } else {
-                        _showCustomSnackBar('فشل تسجيل الدخول، حاول مرة أخرى.');
+                      final enteredName = nameController.text.trim();
+                      if (enteredName.isEmpty) {
+                        _showCustomSnackBar('يرجى كتابة اسمك للمتابعة كضيف');
+                        return;
                       }
+
+                      Navigator.pop(context); // إغلاق الدايلوغ
+
+                      // حفظ بيانات الضيف ببريد إلكتروني تلقائي name@email.com
+                      final guestUser = await _controller.signInAsGuest(
+                        enteredName,
+                      );
+                      _navigateToResult(request);
                     },
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.g_mobiledata_rounded, size: 28),
-                        SizedBox(width: 6),
-                        Text(
-                          'ادخل بحساب غوغل لاعرف\n جاوبك اكتر يا عيني',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                    child: const Text(
+                      'المتابعة كضيف',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+
+                  // زر تسجيل الدخول من خلال جوجل (يظهر فقط في Android)
+                  // if (Platform.isAndroid) ...[
+                  //   const SizedBox(height: 12),
+                  //   OutlinedButton(
+                  //     style: OutlinedButton.styleFrom(
+                  //       foregroundColor: primaryCoffee,
+                  //       minimumSize: const Size(double.infinity, 50),
+                  //       side: BorderSide(
+                  //         color: primaryCoffee.withOpacity(0.2),
+                  //         width: 1.5,
+                  //       ),
+                  //       shape: RoundedRectangleBorder(
+                  //         borderRadius: BorderRadius.circular(16),
+                  //       ),
+                  //     ),
+                  //     onPressed: () async {
+                  //       Navigator.pop(context); // إغلاق الدايلوغ
+                  //       final user = await _controller.signInWithGoogle();
+                  //       if (user != null) {
+                  //         _navigateToResult(request);
+                  //       } else {
+                  //         _showCustomSnackBar(
+                  //           'فشل تسجيل الدخول، حاول مرة أخرى.',
+                  //         );
+                  //       }
+                  //     },
+                  //     child: const Row(
+                  //       mainAxisAlignment: MainAxisAlignment.center,
+                  //       children: [
+                  //         Icon(Icons.g_mobiledata_rounded, size: 28),
+                  //         SizedBox(width: 6),
+                  //         Text(
+                  //           'ادخل بحساب غوغل لاعرف\n جاوبك اكتر يا عيني',
+                  //           style: TextStyle(
+                  //             fontSize: 16,
+                  //             fontWeight: FontWeight.bold,
+                  //           ),
+                  //         ),
+                  //       ],
+                  //     ),
+                  //   ),
+                  // ],
+
+                  const SizedBox(height: 8),
+
+                  // زر الإلغاء
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      foregroundColor: primaryCoffee.withOpacity(0.5),
+                    ),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                 ],
-        
-                const SizedBox(height: 8),
-        
-                // زر الإلغاء
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: TextButton.styleFrom(
-                    foregroundColor: primaryCoffee.withOpacity(0.5),
-                  ),
-                  child: const Text(
-                    'إلغاء',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+void _navigateToResult(ReadingRequest request) {
+  // التحقق من القيم الأساسية قبل الانتقال
+  if (selectedCountry == null || selectedRegion == null || selectedZodiac == null) {
+    _showCustomSnackBar('يرجى اختيار البلد، المنطقة، والبرج أولاً');
+    return;
+  }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ResultScreen(
+        request: request,
+        controller: _controller,
+        country: selectedCountry!,
+        region: selectedRegion!,
+        zodiac: selectedZodiac!,
+        // استخدام ?. بدلاً من ! وتوفير اسم افتراضي في حال كان null
+        UserName: _controller.currentUser?.displayName ?? 'يا عيني',
+      ),
     ),
   );
 }
-
-  void _navigateToResult(ReadingRequest request) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ResultScreen(
-          request: request,
-          controller: _controller,
-          country: selectedCountry!,
-          region: selectedRegion!,
-          zodiac: selectedZodiac!,
-          UserName: _controller.currentUser!.displayName,
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -729,11 +798,10 @@ void _showLoginDialog(ReadingRequest request) {
                   ),
                   child: Column(
                     children: [
-                      // ================= الدروي داون الأول (البلد) =================
+                      // ================= القائمة الأولى (البلد) =================
                       DropdownButtonFormField<String>(
                         value: selectedCountry,
-                        isExpanded:
-                            true, // لمنع خطأ تجاوز النص إذا كان الاسم طويلاً
+                        isExpanded: true,
                         decoration: InputDecoration(
                           labelText: 'اختر البلد',
                           labelStyle: const TextStyle(
@@ -741,14 +809,13 @@ void _showLoginDialog(ReadingRequest request) {
                             fontSize: 17,
                           ),
                           prefixIcon: Padding(
-                            // استخدام Directional ليتناسب مع اللغة العربية RTL
                             padding: const EdgeInsetsDirectional.only(
                               start: 14.0,
                               end: 12.0,
                             ),
                             child: ClipOval(
                               child: SizedBox(
-                                width: 32, // تم تصغير الحجم ليتناسق مع النص
+                                width: 32,
                                 height: 32,
                                 child: Image.asset(
                                   'assets/global.png',
@@ -758,7 +825,7 @@ void _showLoginDialog(ReadingRequest request) {
                             ),
                           ),
                           prefixIconConstraints: const BoxConstraints(
-                            minWidth: 50, // لضبط المساحة الكلية للأيقونة
+                            minWidth: 50,
                             minHeight: 32,
                           ),
                           border: OutlineInputBorder(
@@ -766,7 +833,7 @@ void _showLoginDialog(ReadingRequest request) {
                           ),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
-                            vertical: 14, // زيادة طفيفة ليتوسط النص مع الصورة
+                            vertical: 14,
                           ),
                         ),
                         items: arabCountriesAndRegions.keys.map((country) {
@@ -781,13 +848,17 @@ void _showLoginDialog(ReadingRequest request) {
                         onChanged: (val) {
                           setState(() {
                             selectedCountry = val;
-                            selectedRegion = null;
+                            selectedRegion =
+                                null; // إعادة تعيين المنطقة فور تغيير البلد
                           });
+                          // حفظ البلد وإلغاء حفظ المنطقة القديمة
+                          _saveSelection(keyCountry, val);
+                          _saveSelection(keyRegion, null);
                         },
                       ),
                       const SizedBox(height: 12),
 
-                      // ================= الدروي داون الثاني (المنطقة) =================
+                      // ================= القائمة الثانية (المنطقة) =================
                       DropdownButtonFormField<String>(
                         value: selectedRegion,
                         isExpanded: true,
@@ -842,11 +913,13 @@ void _showLoginDialog(ReadingRequest request) {
                           setState(() {
                             selectedRegion = val;
                           });
+                          // حفظ المنطقة
+                          _saveSelection(keyRegion, val);
                         },
                       ),
                       const SizedBox(height: 12),
 
-                      // ================= الدروي داون الثالث (البرج) =================
+                      // ================= القائمة الثالثة (البرج) =================
                       DropdownButtonFormField<String>(
                         value: selectedZodiac,
                         isExpanded: true,
@@ -862,15 +935,12 @@ void _showLoginDialog(ReadingRequest request) {
                               end: 12.0,
                             ),
                             child: ClipOval(
-                              child: Container(
+                              child: SizedBox(
                                 width: 32,
                                 height: 32,
-                                // إذا كانت أيقونة البرج شفافة وتحتاج خلفية، يمكنك إضافة لون هنا:
-                                // color: primaryCoffee.withOpacity(0.05),
                                 child: Image.asset(
                                   'assets/zodiac.png',
-                                  fit: BoxFit
-                                      .cover, // أو BoxFit.contain إذا كانت الأيقونة تنقص من الحواف
+                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),
@@ -900,13 +970,20 @@ void _showLoginDialog(ReadingRequest request) {
                           setState(() {
                             selectedZodiac = val;
                           });
+                          // حفظ البرج
+                          _saveSelection(keyZodiac, val);
                         },
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 50),
-
+                ServiceCardWidget(
+                  title: 'فضفض للجدة',
+                  subtitle: 'اخبر الجدة عن مشكلتك',
+                  icon: Image.asset('assets/problem.png'),
+                  onTap: () => _handleServiceSelection(ReadingType.talk),
+                ),
                 ServiceCardWidget(
                   title: 'قراءة الفنجان',
                   subtitle: 'التقط صورة لفنجانك واعرف طالعك',

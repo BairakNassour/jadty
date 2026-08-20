@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:jadty/component/AppColors.dart';
 import 'package:jadty/controller/result_controller.dart';
 import 'package:jadty/model/reading_request.dart';
@@ -33,6 +34,20 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen> {
   late ResultController _resultController;
 
+  // المتغيرات الخاصة بالإعلان البيني (AdMob Interstitial)
+  InterstitialAd? _interstitialAd;
+  bool _isAdLoaded = false;
+
+  // معرفات إعلانات الاختبار الرسمية من AdMob
+  String get interstitialAdUnitId {
+    if (Platform.isAndroid) {
+      return 'ca-app-pub-3940256099942544/1033173712'; // Android Test Ad Unit
+    } else if (Platform.isIOS) {
+      return 'ca-app-pub-3940256099942544/4411468910'; // iOS Test Ad Unit
+    }
+    return 'ca-app-pub-3940256099942544/1033173712';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,10 +58,63 @@ class _ResultScreenState extends State<ResultScreen> {
       country: widget.country,
       userName: widget.UserName,
     );
+
+    // تحميل وعرض الإعلان أثناء فترة انتظار التحليل
+    _loadAndShowInterstitialAd();
+  }
+
+  /// تحميل الإعلان البيني وعرضه فور تجهيزه أثناء انتظار التحليل
+  void _loadAndShowInterstitialAd() {
+    InterstitialAd.load(
+      adUnitId: interstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          debugPrint('=== ResultScreen: تم تحميل الإعلان البيني بنجاح ===');
+          if (!mounted) return;
+          setState(() {
+            _interstitialAd = ad;
+            _isAdLoaded = true;
+          });
+
+          // عرض الإعلان البيني مباشرة أثناء وقت الانتظار
+          _showInterstitialAd();
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('=== ResultScreen: فشل تحميل الإعلان البيني: $error ===');
+          if (!mounted) return;
+          setState(() {
+            _isAdLoaded = false;
+            _interstitialAd = null;
+          });
+        },
+      ),
+    );
+  }
+
+  /// عرض الإعلان البيني في حال تم تحميله
+  void _showInterstitialAd() {
+    if (_isAdLoaded && _interstitialAd != null) {
+      _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdDismissedFullScreenContent: (ad) {
+          ad.dispose();
+          _interstitialAd = null;
+          _isAdLoaded = false;
+        },
+        onAdFailedToShowFullScreenContent: (ad, error) {
+          ad.dispose();
+          _interstitialAd = null;
+          _isAdLoaded = false;
+        },
+      );
+
+      _interstitialAd!.show();
+    }
   }
 
   @override
   void dispose() {
+    _interstitialAd?.dispose();
     _resultController.dispose();
     super.dispose();
   }
@@ -61,10 +129,12 @@ class _ResultScreenState extends State<ResultScreen> {
         return 'سؤال الجدة';
       case ReadingType.dream:
         return 'تفسير الحلم';
+      case ReadingType.talk:
+        return 'خبر الجدة عن مشكلتك';
     }
   }
 
-@override
+  @override
   Widget build(BuildContext context) {
     bool hasImage = widget.request.imagePath != null &&
         widget.request.imagePath!.isNotEmpty;
@@ -75,7 +145,7 @@ class _ResultScreenState extends State<ResultScreen> {
         backgroundColor: bgColor,
         appBar: AppBar(
           elevation: 0,
-          scrolledUnderElevation: 0, // لمنع تغير اللون عند التمرير
+          scrolledUnderElevation: 0,
           backgroundColor: Colors.transparent,
           centerTitle: true,
           title: Text(
@@ -114,7 +184,7 @@ class _ResultScreenState extends State<ResultScreen> {
 
                     const SizedBox(height: 40),
 
-                    // 2️⃣ + 3️⃣ بطاقة كلام الجدة مدمجة مع صورتها بتصميم عصري (Overlapping Stack)
+                    // 2️⃣ + 3️⃣ بطاقة كلام الجدة مدمجة مع صورتها بتصميم عصري
                     Stack(
                       clipBehavior: Clip.none,
                       alignment: Alignment.topCenter,
@@ -222,7 +292,6 @@ class _ResultScreenState extends State<ResultScreen> {
               File(widget.request.imagePath!),
               fit: BoxFit.cover,
             ),
-            // تدرج لوني أكثر نعومة لظهور النصوص بوضوح
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -261,7 +330,6 @@ class _ResultScreenState extends State<ResultScreen> {
       decoration: BoxDecoration(
         color: surfaceWhite,
         borderRadius: BorderRadius.circular(28),
-        // حد جانبي عصري يعطي طابع الاقتباس
         border: Border(
           right: BorderSide(color: accentOrange.withOpacity(0.7), width: 5),
         ),
@@ -392,7 +460,6 @@ class _ResultScreenState extends State<ResultScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // صف الأزرار (تشغيل الصوت + النسخ) بتصميم متناسق
         Row(
           children: [
             Expanded(
@@ -459,7 +526,6 @@ class _ResultScreenState extends State<ResultScreen> {
                             'تم نسخ كلام الجدة بنجاح!',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                            
                             ),
                           ),
                         ],
@@ -480,8 +546,6 @@ class _ResultScreenState extends State<ResultScreen> {
         const SizedBox(height: 24),
         const Divider(height: 1, thickness: 1.5, color: bgColor),
         const SizedBox(height: 24),
-        
-        // النص الفعلي لكلام الجدة
         Text(
           _resultController.grandmaResponse,
           style: const TextStyle(
@@ -496,7 +560,6 @@ class _ResultScreenState extends State<ResultScreen> {
     );
   }
 
-  // تم إضافة ميزة darkTheme للباج حتى يظهر بوضوح سواء على الصور أو على الخلفيات البيضاء
   Widget _buildBadge(IconData icon, String text, {bool darkTheme = false}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),

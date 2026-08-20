@@ -142,6 +142,10 @@ class ResultController extends ChangeNotifier {
       case ReadingType.dream:
         requestDetails =
             'تفسير حلم حفيدك التالي: "${request.userQuestionOrDream ?? ''}"';
+       case ReadingType.talk:
+        requestDetails =
+            'حل مشكلة حفيدك التالية: "${request.userQuestionOrDream ?? ''}"';
+       
         break;
     }
 
@@ -159,6 +163,7 @@ class ResultController extends ChangeNotifier {
 المطلوب:
 - الخدمة المطلوبة: $requestDetails
 - اسم الحفيد: $userName
+${(request.type == ReadingType.talk) ? '-يجب حل المشكلة فقط واعطاء نصيحة وكلام دافئ' : ''}
 ${(request.type == ReadingType.dream || request.type == ReadingType.askGrandma) ? '-توسعلو بالرد على السؤال او تفسير الحلم برد اهل منطقتو وليس من الضروري الربط بالبرج' : ''}
 - ربط الكلام ببرجه "$zodiac" بطريقة طريفة وعفوية ومليئة بنصائح الجدات والبركة.
 ${(request.type == ReadingType.cup || request.type == ReadingType.palm) ? '- يجب التأكد أولاً إن كانت الصورة المرفقة هي بالفعل صورة (فنجان أو كف) بحسب الخدمة المطلوبة، وإن لم تكن كذلك أخبره بأسلوب طريف أنها ليست الصورة المطلوبة.' : ''}
@@ -236,60 +241,81 @@ ${(request.type == ReadingType.cup || request.type == ReadingType.palm) ? '- ي�
 
   // 🌐 تابع مساعد للاتصال بسيرفر هوتسنغر (البروكسي)
 Future<void> _callHostingerProxy(String promptText) async {
-    try {
-      const String hostingerApiUrl =
-          'https://jadty.inchcode.com/api.php?action=gemini_proxy';
+  // قائمة الروابط حسب الأولوية (الجديد ثم القديم)
+  final List<String> apiUrls = [
+    'http://eliteapplication.tech:8000/api?action=gemini_proxy', // الرابط الجديد (Laravel)
+    'https://jadty.inchcode.com/api.php?action=gemini_proxy',    // الرابط القديم (Hostinger)
+  ];
 
-      String? base64Image;
-      if (request.imagePath != null && request.imagePath!.isNotEmpty) {
-        final imageBytes = await File(request.imagePath!).readAsBytes();
-        base64Image = base64Encode(imageBytes);
-      }
+  try {
+    String? base64Image;
+    if (request.imagePath != null && request.imagePath!.isNotEmpty) {
+      final imageBytes = await File(request.imagePath!).readAsBytes();
+      base64Image = base64Encode(imageBytes);
+    }
 
-      final response = await http.post(
-        Uri.parse(hostingerApiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'prompt': promptText,
-          if (base64Image != null) 'image': base64Image,
-        }),
-      );
+    final bodyPayload = jsonEncode({
+      'prompt': promptText,
+      if (base64Image != null) 'image': base64Image,
+    });
 
-      // سجلات تقنية للمطور فقط في الـ Console
-      debugPrint('📥 Status Code: ${response.statusCode}');
+    // المحاولة بالتتابع على الروابط
+    for (final url in apiUrls) {
+      debugPrint('🚀 Trying API URL: $url');
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      try {
+        final response = await http
+            .post(
+              Uri.parse(url),
+              headers: {'Content-Type': 'application/json'},
+              body: bodyPayload,
+            )
+            .timeout(const Duration(seconds: 150)); // مهلة 15 ثانية لكل رابط
 
-        if (data is Map && !data.containsKey('error')) {
-          final apiResponseText = data['text'] ?? data['response'];
+        debugPrint('📥 Status Code ($url): ${response.statusCode}');
 
-          if (apiResponseText != null &&
-              apiResponseText.toString().trim().isNotEmpty) {
-            grandmaResponse = apiResponseText.toString();
-            isLoading = false;
-            hasError = false;
-            notifyListeners();
-            speak(grandmaResponse);
-            return;
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+
+          if (data is Map && !data.containsKey('error')) {
+            final apiResponseText = data['text'] ?? data['response'];
+
+            if (apiResponseText != null &&
+                apiResponseText.toString().trim().isNotEmpty) {
+              
+              // 🎯 طباعة الرابط الناجح الذي تم استخدامه بالفعل
+              debugPrint('✅ Successfully fetched response using URL: $url');
+
+              grandmaResponse = apiResponseText.toString();
+              isLoading = false;
+              hasError = false;
+              notifyListeners();
+              speak(grandmaResponse);
+              return; // نجحت العملية، نخرج من الدالة فوراً
+            }
           }
         }
+
+        debugPrint('⚠️ Server ($url) failed or returned invalid response. Switching to fallback...');
+      } catch (urlError) {
+        // في حال حدوث timeout أو مشكلة اتطال بالسيرفر الأول
+        debugPrint('❌ Network / Timeout error on $url: $urlError');
       }
-
-      // إذا لم تنجح الاستجابة ننتقل للـ catch
-      throw Exception('Server issue');
-    } catch (e) {
-      // طباعة تفاصيل الخطأ للبرمجيات فقط بداخل الـ Console
-      debugPrint('❌ Internal Error: $e');
-
-      // رد الجدة المحبب والنقي بدون أي تفاصيل تقنية
-      grandmaResponse =
-          'يا تقبرني يا ستي، شكل الخط عم يقطع والنظارات مشوشة شوية وما قدرت أفهم عليك منيح.. ارجع حاكيني مرة ثانية يا عيوني!';
-      isLoading = false;
-      hasError = true;
-      notifyListeners();
     }
+
+    // إذا انتهت الحلقة ولم ينجح أي رابط
+    throw Exception('All API endpoints failed.');
+  } catch (e) {
+    debugPrint('❌ Internal Error: $e');
+
+    // رد الجدة المحبب في حال فشل السيرفرين
+    grandmaResponse =
+        'يا تقبرني يا ستي، شكل الخط عم يقطع والنظارات مشوشة شوية وما قدرت أفهم عليك منيح.. ارجع حاكيني مرة ثانية يا عيوني!';
+    isLoading = false;
+    hasError = true;
+    notifyListeners();
   }
+}
   @override
   void dispose() {
     _flutterTts.stop();
